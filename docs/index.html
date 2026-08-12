@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Predicting Content Decline — A Logistic Regression Approach to Refresh Scoring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F7F8FA;
+    --paper-raised: #FFFFFF;
+    --ink: #14161F;
+    --ink-soft: #4B4F5E;
+    --line: #DDE1E7;
+    --teal: #0F766E;
+    --teal-soft: #E6F3F1;
+    --amber: #B45309;
+    --amber-soft: #FBEEE0;
+    --mono: 'IBM Plex Mono', monospace;
+    --serif: 'Fraunces', serif;
+    --sans: 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: var(--teal); text-decoration-color: rgba(15,118,110,0.35); }
+  a:hover { text-decoration-color: var(--teal); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ---------- Hero ---------- */
+  header.hero {
+    padding: 96px 0 64px;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 18px;
+  }
+  h1.title {
+    font-family: var(--serif);
+    font-optical-sizing: auto;
+    font-weight: 500;
+    font-size: clamp(2.2rem, 5vw, 3.4rem);
+    line-height: 1.08;
+    margin: 0 0 14px;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    font-size: 19px;
+    color: var(--ink-soft);
+    max-width: 46ch;
+    margin: 0 0 40px;
+  }
+
+  .headline-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .stat {
+    background: var(--paper-raised);
+    padding: 20px 18px;
+  }
+  .stat .num {
+    font-family: var(--mono);
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--teal);
+  }
+  .stat .label {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-top: 4px;
+  }
+
+  /* ---------- Sections ---------- */
+  main { padding: 8px 0 40px; }
+  section { padding: 52px 0; border-bottom: 1px solid var(--line); }
+  section:last-of-type { border-bottom: none; }
+
+  h2 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 28px;
+    margin: 0 0 22px;
+    letter-spacing: -0.005em;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 16px;
+    margin: 28px 0 12px;
+    color: var(--ink);
+  }
+  p { margin: 0 0 18px; color: var(--ink); }
+  section > p:first-of-type { margin-top: 0; }
+
+  ul.clean { margin: 0 0 18px; padding-left: 22px; }
+  ul.clean li { margin-bottom: 10px; }
+  ul.clean li::marker { color: var(--teal); }
+
+  code.inline {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    background: var(--teal-soft);
+    color: var(--teal);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  /* ---------- Comparison bars (signature element) ---------- */
+  .compare {
+    margin: 28px 0 8px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--paper-raised);
+    padding: 24px 24px 8px;
+  }
+  .compare-row { margin-bottom: 22px; }
+  .compare-row .metric-name {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+  }
+  .bar-line {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+  .bar-track {
+    flex: 1;
+    height: 22px;
+    background: #EEF0F3;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+  }
+  .bar-fill.baseline { background: var(--amber); }
+  .bar-fill.model { background: var(--teal); }
+  .bar-label {
+    font-family: var(--mono);
+    font-size: 13px;
+    width: 128px;
+    flex-shrink: 0;
+    color: var(--ink-soft);
+  }
+  .bar-value {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    width: 52px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .bar-value.baseline-text { color: var(--amber); }
+  .bar-value.model-text { color: var(--teal); }
+
+  /* ---------- Data tables ---------- */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 15px;
+  }
+  th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    padding: 10px 12px;
+    border-bottom: 2px solid var(--ink);
+  }
+  td {
+    padding: 12px 12px;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 14px;
+  }
+  tr:last-child td { border-bottom: none; }
+
+  /* ---------- Ranked queue (signature: leaderboard) ---------- */
+  .queue { margin: 24px 0; }
+  .queue-row {
+    display: grid;
+    grid-template-columns: 32px 1fr auto;
+    gap: 16px;
+    align-items: center;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: var(--paper-raised);
+  }
+  .queue-pos {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--ink-soft);
+  }
+  .queue-main .hash {
+    font-family: var(--mono);
+    font-size: 13.5px;
+    color: var(--ink);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .queue-meta {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-soft);
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .action-tag {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .action-tag.intervene { background: var(--amber-soft); color: var(--amber); }
+  .action-tag.review { background: var(--teal-soft); color: var(--teal); }
+  .action-tag.evaluate { background: #EEF0F3; color: var(--ink-soft); }
+
+  @media (max-width: 560px) {
+    .queue-row { grid-template-columns: 24px 1fr; }
+    .queue-row .action-tag { grid-column: 1 / -1; justify-self: start; margin-top: 6px; }
+    .headline-stats { grid-template-columns: 1fr; }
+    header.hero { padding: 64px 0 44px; }
+  }
+
+  footer {
+    padding: 40px 0 80px;
+    color: var(--ink-soft);
+    font-size: 14px;
+  }
+  footer a { color: var(--ink-soft); }
+
+  .key-list {
+    font-size: 14px;
+    color: var(--ink-soft);
+    border-left: 2px solid var(--line);
+    padding-left: 16px;
+    margin-top: 20px;
+  }
+  .key-list strong { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">FlyRank ML Internship — Capstone Research Paper</div>
+    <h1 class="title">Predicting Content Decline</h1>
+    <p class="subtitle">A logistic regression approach to refresh scoring, built and validated on real, anonymized Google Search Console data.</p>
+
+    <div class="headline-stats">
+      <div class="stat">
+        <div class="num">0.900</div>
+        <div class="label">Model AUC</div>
+      </div>
+      <div class="stat">
+        <div class="num">0.552</div>
+        <div class="label">Model precision</div>
+      </div>
+      <div class="stat">
+        <div class="num">134,238</div>
+        <div class="label">Page-months analyzed</div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <section id="abstract">
+      <h2>Abstract</h2>
+      <p>Content that once ranked and drew clicks quietly loses traction over time, and by the time a decline is obvious in a dashboard, weeks of visibility are already gone. This study asks whether a page's next-month decline in search clicks can be predicted from its current-month Google Search Console signals, so a content team can review the right pages before the drop compounds.</p>
+      <p>Using 134,238 page-months of real, anonymized FlyRank search data, we built a logistic regression model on five signals — impressions, clicks, average position, CTR, and CTR-gap-to-position-benchmark — trained on February 2026 data to predict March 2026 decline, validated with a client-grouped train/test split. The model reached a precision of <strong>0.552</strong> and an AUC of <strong>0.900</strong>, against a single-variable baseline rule that scored only <strong>0.065</strong> precision and <strong>0.256</strong> AUC — worse than the page-level decline rate itself (18.2%).</p>
+      <p>The result is a ranked, reason-coded list of pages that most warrant editorial review, plus a concrete lesson: an intuitive-sounding heuristic — "low CTR relative to position means trouble" — does not, on its own, predict which pages are about to decline.</p>
+    </section>
+
+    <section id="problem">
+      <h2>1. Problem Statement</h2>
+      <p>Content decay is a persistent, quiet problem in search visibility. Pages that once performed well gradually lose clicks due to algorithm shifts, competitor movement, staleness, or simple neglect — and this loss is rarely obvious until it has already compounded over several reporting cycles. A content team with limited review capacity needs a way to prioritize which pages to check first, rather than reviewing all pages equally or waiting for a visible traffic collapse.</p>
+      <p>This project supports exactly that decision: given a page's current search performance, which pages are worth a reviewer's time this month, and why? The output is not a claim about causation — it does not say <em>why</em> a page is declining — but a decision-support ranking that directs limited attention where it is most likely to matter.</p>
+    </section>
+
+    <section id="data">
+      <h2>2. Data</h2>
+      <ul class="clean">
+        <li><strong>Source:</strong> the FlyRank ML Internship dataset (<code class="inline">hf://datasets/FlyRank/internship-warehouse</code>), accessed via a gated Hugging Face token.</li>
+        <li><strong>Table:</strong> <code class="inline">fact_content_daily_performance</code>, a daily grain table (one row = one page, one day, one client), aggregated here to page-month.</li>
+        <li><strong>Time window:</strong> features built entirely from February 2026 (<code class="inline">month=2026-02</code>). The decline label compares February clicks to March clicks — features never see the outcome month.</li>
+        <li><strong>Filtering:</strong> restricted to rows where <code class="inline">client_has_gsc IS TRUE</code> and <code class="inline">gsc_data_available IS TRUE</code>, and to pages with at least one recorded impression in February.</li>
+        <li><strong>Excluded:</strong> the <code class="inline">ai_*</code> referral breakdown columns were excluded from modeling — sparsely populated in this panel, and not needed for a click-decline signal specifically.</li>
+        <li><strong>Final analysis set:</strong> 134,238 page-months, of which 18.2% declined and 81.8% did not.</li>
+      </ul>
+    </section>
+
+    <section id="methodology">
+      <h2>3. Methodology</h2>
+
+      <h3>3.1 Features</h3>
+      <ul class="clean">
+        <li><code class="inline">total_impressions</code> — total February GSC impressions.</li>
+        <li><code class="inline">total_clicks</code> — total February GSC clicks.</li>
+        <li><code class="inline">avg_position</code> — average February search position.</li>
+        <li><code class="inline">ctr</code> — February click-through rate.</li>
+        <li><code class="inline">ctr_gap</code> — the page's CTR subtracted from the average CTR of pages in the same position bucket (1–3, 4–10, 11–20, 21–50, 51+). Positive means underperforming position peers.</li>
+      </ul>
+      <p>Every feature is computed from data fully observed at the moment a reviewer would act — nothing is derived from March, and nothing is derived from the label itself.</p>
+
+      <h3>3.2 Label Definition</h3>
+      <p><code class="inline">declining = 1</code> if a page's total March 2026 clicks were strictly lower than its total February 2026 clicks; 0 otherwise. This is a proxy for real content decay, not a ground-truth judgment — a single month-over-month comparison can also reflect ordinary noise, seasonality, or a one-off event.</p>
+
+      <h3>3.3 Baseline</h3>
+      <p>The baseline mirrors a hand-written rule built earlier in this track: flag a page as "declining" if its <code class="inline">ctr_gap</code> falls in the worst 20% of the training set — treating CTR underperformance relative to position as a stand-in for decline risk.</p>
+
+      <h3>3.4 Validation Design</h3>
+      <p>Train/test split: <code class="inline">GroupShuffleSplit</code> (70/30), grouped by <code class="inline">client_hash_id</code> — entire clients, not individual pages, are assigned to either train or test, so the model never trains and tests on different pages from the same client.</p>
+      <p>Model: <code class="inline">LogisticRegression</code> with <code class="inline">class_weight='balanced'</code>, on standardized features (zero mean, unit variance). Standardization was necessary because raw feature scales differ by several orders of magnitude — without it, predicted probabilities saturated toward 0 or 1 for nearly every page regardless of actual risk, making the ranking meaningless. This was caught and corrected during development — see Limitations.</p>
+    </section>
+
+    <section id="results">
+      <h2>4. Results</h2>
+      <p>The model substantially outperformed the baseline rule on the same held-out client split:</p>
+
+      <div class="compare">
+        <div class="compare-row">
+          <div class="metric-name">PRECISION</div>
+          <div class="bar-line">
+            <div class="bar-label">Baseline</div>
+            <div class="bar-track"><div class="bar-fill baseline" style="width:6.5%"></div></div>
+            <div class="bar-value baseline-text">0.065</div>
+          </div>
+          <div class="bar-line">
+            <div class="bar-label">Model</div>
+            <div class="bar-track"><div class="bar-fill model" style="width:55.2%"></div></div>
+            <div class="bar-value model-text">0.552</div>
+          </div>
+        </div>
+        <div class="compare-row">
+          <div class="metric-name">AUC</div>
+          <div class="bar-line">
+            <div class="bar-label">Baseline</div>
+            <div class="bar-track"><div class="bar-fill baseline" style="width:25.6%"></div></div>
+            <div class="bar-value baseline-text">0.256</div>
+          </div>
+          <div class="bar-line">
+            <div class="bar-label">Model</div>
+            <div class="bar-track"><div class="bar-fill model" style="width:90%"></div></div>
+            <div class="bar-value model-text">0.900</div>
+          </div>
+        </div>
+      </div>
+
+      <p>Notably, the baseline's precision (0.065) is worse than the page-level base rate of decline (18.2%) — a rule that flagged pages at random would have outperformed it. CTR-gap-to-position-benchmark, taken alone, is not a meaningful predictor of month-over-month click decline, even though it is an intuitive, commonly-used heuristic.</p>
+
+      <h3>Standardized feature coefficients</h3>
+      <table>
+        <thead><tr><th>Feature</th><th>Coefficient</th></tr></thead>
+        <tbody>
+          <tr><td>ctr</td><td>+3.146</td></tr>
+          <tr><td>ctr_gap</td><td>−1.479</td></tr>
+          <tr><td>impressions</td><td>+0.941</td></tr>
+          <tr><td>clicks</td><td>−0.401</td></tr>
+          <tr><td>avg_position</td><td>−0.232</td></tr>
+        </tbody>
+      </table>
+      <p>CTR and CTR-gap carry the largest weight, in opposing directions — consistent with the multicollinearity limitation below. Impressions contributes positively: higher-volume pages are somewhat more likely to be flagged, plausible since decline in a well-trafficked page is both easier to detect and more consequential to catch.</p>
+    </section>
+
+    <section id="limitations">
+      <h2>5. Limitations</h2>
+      <ul class="clean">
+        <li><strong>Multicollinearity:</strong> <code class="inline">ctr_gap</code> is derived directly from <code class="inline">ctr</code>, so the two features compete for the same signal. Their coefficients are large and opposite in sign, making individual coefficients harder to interpret in isolation — even though overall predictive performance (AUC 0.900) is stable.</li>
+        <li><strong>Feature scale sensitivity:</strong> an early, unscaled version of this model produced predicted probabilities pinned at 1.0 for nearly all pages, driven by impressions' raw magnitude dominating the logit. Standardizing features corrected this — reported here as a limitation of logistic regression on unscaled inputs generally, not a property of the data.</li>
+        <li><strong>Low-volume noise:</strong> pages with very few impressions can produce extreme CTR ratios (1 click / 1 impression = 100% CTR) that aren't reliable signal. A minimum-impression threshold (100+) was applied before ranking, though two rows in the final top 10 (108 and 242 impressions) remain close to that floor and warrant lower confidence.</li>
+        <li><strong>Proxy label, single comparison window:</strong> the decline label compares exactly two months and cannot distinguish a genuine structural decline from ordinary noise, seasonality, or a one-off event. A page flagged as "declining" is observed to have fewer March clicks than February clicks — nothing more.</li>
+        <li><strong>Directional support, not causal proof:</strong> this model identifies pages statistically similar to others that lost clicks. It does not identify why a given page is losing clicks, and makes no claim about Google's ranking algorithm or the causal effect of any specific content change.</li>
+      </ul>
+    </section>
+
+    <section id="recommendations">
+      <h2>6. Ranked Recommendations</h2>
+      <p>The following pages, drawn from the held-out test set and filtered to a minimum of 100 impressions, received the model's highest decline-risk scores.</p>
+
+      <div class="queue">
+        <div class="queue-row">
+          <div class="queue-pos">01</div>
+          <div class="queue-main">
+            <span class="hash">content_caf756e63ca7f979</span>
+            <div class="queue-meta"><span>108 impr</span><span>pos 6.23</span><span>CTR 18.5%</span></div>
+          </div>
+          <div class="action-tag review">High Priority Review</div>
+        </div>
+        <div class="queue-row">
+          <div class="queue-pos">02</div>
+          <div class="queue-main">
+            <span class="hash">content_e241d6415ac9e534</span>
+            <div class="queue-meta"><span>164,152 impr</span><span>pos 2.93</span><span>CTR 0.24%</span></div>
+          </div>
+          <div class="action-tag review">High Priority Review</div>
+        </div>
+        <div class="queue-row">
+          <div class="queue-pos">03</div>
+          <div class="queue-main">
+            <span class="hash">content_b99ea6861864dea5</span>
+            <div class="queue-meta"><span>160,699 impr</span><span>pos 3.72</span><span>CTR 0.17%</span></div>
+          </div>
+          <div class="action-tag review">High Priority Review</div>
+        </div>
+        <div class="queue-row">
+          <div class="queue-pos">04</div>
+          <div class="queue-main">
+            <span class="hash">content_8e1334d6356668e3</span>
+            <div class="queue-meta"><span>203,401 impr</span><span>pos 4.97</span><span>CTR 0.001%</span></div>
+          </div>
+          <div class="action-tag intervene">Immediate Intervention</div>
+        </div>
+        <div class="queue-row">
+          <div class="queue-pos">05</div>
+          <div class="queue-main">
+            <span class="hash">content_3d4c0a897ebc9abd</span>
+            <div class="queue-meta"><span>242 impr</span><span>pos 3.65</span><span>CTR 18.2%</span></div>
+          </div>
+          <div class="action-tag evaluate">Evaluate Intent Match</div>
+        </div>
+        <div class="queue-row">
+          <div class="queue-pos">06</div>
+          <div class="queue-main">
+            <span class="hash">content_9c057b66c30a3abb</span>
+            <div class="queue-meta"><span>195,648 impr</span><span>pos 2.49</span><span>CTR 0.001%</span></div>
+          </div>
+          <div class="action-tag intervene">Immediate Intervention</div>
+        </div>
+        <div class="queue-row">
+          <div class="queue-pos">07</div>
+          <div class="queue-main">
+            <span class="hash">content_fec55986a1868d62</span>
+            <div class="queue-meta"><span>193,954 impr</span><span>pos 3.84</span><span>CTR 0.00%</span></div>
+          </div>
+          <div class="action-tag intervene">Immediate Intervention</div>
+        </div>
+        <div class="queue-row">
+          <div class="queue-pos">08</div>
+          <div class="queue-main">
+            <span class="hash">content_acbcc847f8996314</span>
+            <div class="queue-meta"><span>148,256 impr</span><span>pos 3.91</span><span>CTR 0.16%</span></div>
+          </div>
+          <div class="action-tag review">High Priority Review</div>
+        </div>
+        <div class="queue-row">
+          <div class="queue-pos">09</div>
+          <div class="queue-main">
+            <span class="hash">content_c9f840183215651b</span>
+            <div class="queue-meta"><span>125,035 impr</span><span>pos 9.37</span><span>CTR 0.00%</span></div>
+          </div>
+          <div class="action-tag intervene">Immediate Intervention</div>
+        </div>
+        <div class="queue-row">
+          <div class="queue-pos">10</div>
+          <div class="queue-main">
+            <span class="hash">content_bdc656fc8f037ac0</span>
+            <div class="queue-meta"><span>133 impr</span><span>pos 4.02</span><span>CTR 13.5%</span></div>
+          </div>
+          <div class="action-tag evaluate">Evaluate Intent Match</div>
+        </div>
+      </div>
+
+      <div class="key-list">
+        <strong>Immediate Intervention</strong> — near-zero CTR despite meaningful position and volume, the clearest signal of a broken title/meta or SERP feature displacement.<br><br>
+        <strong>High Priority Review</strong> — clearly underperforming its position benchmark at real volume, worth a reviewer's attention this cycle.<br><br>
+        <strong>Evaluate Intent Match</strong> — lower-volume pages where the CTR pattern is less certain; worth a lighter-touch check rather than an urgent rewrite.
+      </div>
+    </section>
+
+    <section id="reproducibility">
+      <h2>7. Reproducibility</h2>
+      <p>Repository: <a href="https://github.com/UmairAsim180/1_FlyRank-Internship" target="_blank" rel="noopener">github.com/UmairAsim180/1_FlyRank-Internship</a></p>
+      <p>Notebooks: the full pipeline — task framing, data contract, baseline rule, and this capstone model — lives under <code class="inline">work/notebooks/</code> in the repository above, including the exact DuckDB queries used to build every number reported here.</p>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>Built on the FlyRank ML Internship dataset. Data credit: <a href="https://flyrank.ai" target="_blank" rel="noopener">flyrank.ai</a></p>
+  </footer>
+</div>
+
+</body>
+</html>
